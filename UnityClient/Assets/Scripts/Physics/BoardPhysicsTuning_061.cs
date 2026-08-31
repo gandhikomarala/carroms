@@ -1,0 +1,29 @@
+namespace CarromArena.Physics
+{
+    using System;
+    using UnityEngine;
+
+    /// <summary>
+    /// 2D Board Surface Physics & Settlement Detector #061
+    /// Tracks coin linear/rotational velocities and validates board settlement before next turn.
+    /// </summary>
+    public class BoardPhysicsTuning_061 : MonoBehaviour
+    {
+        [Header("Settlement Parameters")]
+        [SerializeField] private float velocityStopThreshold = 0.05f;
+        [SerializeField] private float settleDelaySeconds = 0.35f;
+        [SerializeField] private float borderBounceRestitution = 0.85f;
+
+        public bool IsBoardAtRest(Rigidbody2D[] activePieces)
+        {
+            foreach (var piece in activePieces)
+            {
+                if (piece != null && piece.velocity.sqrMagnitude > (velocityStopThreshold * velocityStopThreshold))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+}

@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>CARROM ARENA — Traditional Digital Board Game</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at center, #2e1065 0%, #0f172a 60%, #020617 100%);
+      color: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      touch-action: none;
+    }
+
+    #game-container {
+      position: relative;
+      width: min(92vw, 680px);
+      height: min(92vw, 680px);
+      box-shadow: 0 15px 45px rgba(0, 0, 0, 0.8), 0 0 40px rgba(168, 85, 247, 0.3);
+      border-radius: 24px;
+      overflow: hidden;
+    }
+
+    #game-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: crosshair;
+    }
+
+    /* HUD OVERLAY */
+    #hud-top {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .hud-badge {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      padding: 8px 18px;
+      border-radius: 18px;
+      border: 1.5px solid rgba(168, 85, 247, 0.5);
+      font-size: 15px;
+      font-weight: 800;
+      color: #c084fc;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    }
+
+    /* BASELINE POSITIONING SLIDER */
+    #baseline-control {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      padding: 8px 24px;
+      border-radius: 24px;
+      border: 1.5px solid rgba(56, 189, 248, 0.5);
+      z-index: 10;
+    }
+
+    #slider-striker-pos {
+      width: 220px;
+      accent-color: #38bdf8;
+      cursor: pointer;
+    }
+
+    /* MODALS */
+    .game-modal {
+      position: absolute;
+      inset: 0;
+      z-index: 50;
+      background: rgba(15, 23, 42, 0.94);
+      backdrop-filter: blur(16px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .modal-title {
+      font-size: 38px;
+      font-weight: 900;
+      color: #fbbf24;
+      letter-spacing: 2px;
+      text-shadow: 0 0 25px rgba(251, 191, 36, 0.7);
+    }
+
+    .btn-play-primary {
+      margin-top: 24px;
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      border: none;
+      padding: 16px 48px;
+      border-radius: 32px;
+      color: #fff;
+      font-size: 18px;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 8px 30px rgba(245, 158, 11, 0.6);
+      transition: transform 0.15s;
+    }
+
+    .btn-play-primary:hover { transform: scale(1.06); }
+    .btn-play-primary:active { transform: scale(0.95); }
+  </style>
+</head>
+<body>
+
+<div id="game-container">
+  <canvas id="game-canvas"></canvas>
+
+  <div id="hud-top">
+    <div class="hud-badge">⚪ WHITE: <span id="lbl-score-white">0</span></div>
+    <div class="hud-badge" style="border-color:#ef4444; color:#f87171;">👑 QUEEN: <span id="lbl-queen">CENTER</span></div>
+    <div class="hud-badge" style="border-color:#94a3b8; color:#cbd5e1;">⚫ BLACK: <span id="lbl-score-black">0</span></div>
+  </div>
+
+  <div id="baseline-control">
+    <span style="font-size:12px; font-weight:800; color:#38bdf8;">POSITION:</span>
+    <input type="range" id="slider-striker-pos" min="-160" max="160" value="0">
+  </div>
+
+  <!-- START MODAL -->
+  <div class="game-modal" id="start-modal">
+    <h1 class="modal-title">🎯 CARROM ARENA</h1>
+    <p style="color:#94a3b8; font-size:14px; margin-top:10px; max-width:320px;">
+      Slide the bottom bar to position your Striker. Click/Touch & Drag backwards to aim and set power, then release to shoot coins into the 4 corner pockets!
+    </p>
+    <div style="margin-top:16px; font-size:13px; color:#38bdf8; font-weight:700;">
+      ⚪ White = 10 pts • ⚫ Black = 10 pts • 👑 Queen = 30 pts
+    </div>
+    <button class="btn-play-primary" id="btn-start-game">PLAY MATCH</button>
+  </div>
+</div>
+
+<!-- AUDIO SYNTHESIS -->
+<script>
+class CarromAudio {
+  constructor() { this.ctx = null; }
+  init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+  play(f, d = 0.1, type = "sine", gain = 0.25) {
+    try {
+      this.init();
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(f, this.ctx.currentTime);
+      g.gain.setValueAtTime(gain, this.ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + d);
+      osc.connect(g);
+      g.connect(this.ctx.destination);
+      osc.start();
+      osc.stop(this.ctx.currentTime + d);
+    } catch(e) {}
+  }
+}
+const sfx = new CarromAudio();
+</script>
+
+<!-- 2D CARROM PHYSICS SIMULATOR -->
+<script>
+class CarromArenaEngine {
+  constructor() {
+    this.canvas = document.getElementById("game-canvas");
+    this.ctx = this.canvas.getContext("2d");
+    this.size = 600;
+    this.canvas.width = this.size;
+    this.canvas.height = this.size;
+
+    this.boardSize = 540;
+    this.halfBoard = this.boardSize / 2;
+    this.center = this.size / 2;
+    this.pocketRadius = 32;
+
+    this.pockets = [
+      { x: this.center - this.halfBoard + 36, y: this.center - this.halfBoard + 36 },
+      { x: this.center + this.halfBoard - 36, y: this.center - this.halfBoard + 36 },
+      { x: this.center - this.halfBoard + 36, y: this.center + this.halfBoard - 36 },
+      { x: this.center + this.halfBoard - 36, y: this.center + this.halfBoard - 36 }
+    ];
+
+    this.strikerBaselineY = this.center + this.halfBoard - 85;
+    this.strikerX = this.center;
+    this.strikerY = this.strikerBaselineY;
+    this.strikerRadius = 20;
+    this.strikerMass = 3.5;
+    this.strikerVx = 0;
+    this.strikerVy = 0;
+
+    this.coins = [];
+    this.coinRadius = 14;
+    this.coinMass = 1.0;
+
+    this.isDragging = false;
+    this.dragStart = { x: 0, y: 0 };
+    this.dragCurrent = { x: 0, y: 0 };
+    this.isShotActive = false;
+
+    this.whiteScore = 0;
+    this.blackScore = 0;
+    this.queenCovered = false;
+
+    this.bindControls();
+  }
+
+  setupPieces() {
+    this.coins = [];
+    // Queen (Red) in center
+    this.coins.push({ x: this.center, y: this.center, vx: 0, vy: 0, type: "QUEEN", color: "#ef4444", radius: this.coinRadius, mass: this.coinMass });
+
+    // Ring of 6 alternating coins
+    const ring1Radius = 30;
+    for (let i = 0; i < 6; i++) {
+      const angle = (i * Math.PI) / 3;
+      const type = (i % 2 === 0) ? "WHITE" : "BLACK";
+      const color = type === "WHITE" ? "#f8fafc" : "#1e293b";
+      this.coins.push({
+        x: this.center + Math.cos(angle) * ring1Radius,
+        y: this.center + Math.sin(angle) * ring1Radius,
+        vx: 0, vy: 0, type, color, radius: this.coinRadius, mass: this.coinMass
+      });
+    }
+
+    // Outer ring of 12 alternating coins
+    const ring2Radius = 58;
+    for (let i = 0; i < 12; i++) {
+      const angle = (i * Math.PI) / 6;
+      const type = (i % 2 === 0) ? "BLACK" : "WHITE";
+      const color = type === "WHITE" ? "#f8fafc" : "#1e293b";
+      this.coins.push({
+        x: this.center + Math.cos(angle) * ring2Radius,
+        y: this.center + Math.sin(angle) * ring2Radius,
+        vx: 0, vy: 0, type, color, radius: this.coinRadius, mass: this.coinMass
+      });
+    }
+
+    this.resetStriker();
+  }
+
+  resetStriker() {
+    const sliderVal = parseFloat(document.getElementById("slider-striker-pos").value);
+    this.strikerX = this.center + sliderVal;
+    this.strikerY = this.strikerBaselineY;
+    this.strikerVx = 0;
+    this.strikerVy = 0;
+    this.isShotActive = false;
+    document.getElementById("baseline-control").style.display = "flex";
+  }
+
+  bindControls() {
+    const slider = document.getElementById("slider-striker-pos");
+    slider.addEventListener("input", () => {
+      if (!this.isShotActive) {
+        this.strikerX = this.center + parseFloat(slider.value);
+      }
+    });
+
+    const getCanvasPos = (clientX, clientY) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const scale = this.size / rect.width;
+      return {
+        x: (clientX - rect.left) * scale,
+        y: (clientY - rect.top) * scale
+      };
+    };
+
+    const onPointerDown = (clientX, clientY) => {
+      if (this.isShotActive) return;
+      const pos = getCanvasPos(clientX, clientY);
+      const dist = Math.hypot(pos.x - this.strikerX, pos.y - this.strikerY);
+      if (dist < this.strikerRadius + 30) {
+        this.isDragging = true;
+        this.dragStart = { x: this.strikerX, y: this.strikerY };
+        this.dragCurrent = pos;
+      }
+    };
+
+    const onPointerMove = (clientX, clientY) => {
+      if (!this.isDragging) return;
+      this.dragCurrent = getCanvasPos(clientX, clientY);
+    };
+
+    const onPointerUp = () => {
+      if (!this.isDragging) return;
+      this.isDragging = false;
+
+      // Shoot striker
+      const dx = this.dragStart.x - this.dragCurrent.x;
+      const dy = this.dragStart.y - this.dragCurrent.y;
+      const power = Math.min(120, Math.hypot(dx, dy));
+
+      if (power > 8) {
+        const angle = Math.atan2(dy, dx);
+        this.strikerVx = Math.cos(angle) * (power * 0.22);
+        this.strikerVy = Math.sin(angle) * (power * 0.22);
+        this.isShotActive = true;
+        document.getElementById("baseline-control").style.display = "none";
+        sfx.play(600, 0.1, "triangle", 0.3);
+      }
+    };
+
+    // Mouse
+    this.canvas.addEventListener("mousedown", (e) => onPointerDown(e.clientX, e.clientY));
+    this.canvas.addEventListener("mousemove", (e) => onPointerMove(e.clientX, e.clientY));
+    window.addEventListener("mouseup", onPointerUp);
+
+    // Touch
+    this.canvas.addEventListener("touchstart", (e) => onPointerDown(e.touches[0].clientX, e.touches[0].clientY));
+    this.canvas.addEventListener("touchmove", (e) => onPointerMove(e.touches[0].clientX, e.touches[0].clientY));
+    window.addEventListener("touchend", onPointerUp);
+
+    document.getElementById("btn-start-game").onclick = () => {
+      document.getElementById("start-modal").style.display = "none";
+      this.whiteScore = 0;
+      this.blackScore = 0;
+      this.setupPieces();
+      this.updateHUD();
+      requestAnimationFrame(this.gameLoop.bind(this));
+    };
+  }
+
+  updateHUD() {
+    document.getElementById("lbl-score-white").innerText = this.whiteScore;
+    document.getElementById("lbl-score-black").innerText = this.blackScore;
+    document.getElementById("lbl-queen").innerText = this.queenCovered ? "SECURED" : "ACTIVE";
+  }
+
+  gameLoop() {
+    this.updatePhysics();
+    this.drawBoard();
+    requestAnimationFrame(this.gameLoop.bind(this));
+  }
+
+  updatePhysics() {
+    const friction = 0.985;
+    const minBound = this.center - this.halfBoard + 24;
+    const maxBound = this.center + this.halfBoard - 24;
+
+    const allPieces = [
+      { obj: this, isStriker: true, radius: this.strikerRadius, mass: this.strikerMass },
+      ...this.coins.map(c => ({ obj: c, isStriker: false, radius: c.radius, mass: c.mass }))
+    ];
+
+    // Move pieces
+    for (let p of allPieces) {
+      const item = p.obj;
+      item.x += (item.vx || item.strikerVx || 0);
+      item.y += (item.vy || item.strikerVy || 0);
+
+      if (p.isStriker) {
+        this.strikerVx *= friction;
+        this.strikerVy *= friction;
+        if (Math.hypot(this.strikerVx, this.strikerVy) < 0.04) {
+          this.strikerVx = 0;
+          this.strikerVy = 0;
+        }
+      } else {
+        item.vx *= friction;
+        item.vy *= friction;
+        if (Math.hypot(item.vx, item.vy) < 0.04) {
+          item.vx = 0;
+          item.vy = 0;
+        }
+      }
+
+      // Board border bounce
+      const px = p.isStriker ? this.strikerX : item.x;
+      const py = p.isStriker ? this.strikerY : item.y;
+
+      if (px - p.radius < minBound) {
+        if (p.isStriker) { this.strikerX = minBound + p.radius; this.strikerVx *= -0.85; }
+        else { item.x = minBound + p.radius; item.vx *= -0.85; }
+        sfx.play(240, 0.05, "sine", 0.1);
+      }
+      if (px + p.radius > maxBound) {
+        if (p.isStriker) { this.strikerX = maxBound - p.radius; this.strikerVx *= -0.85; }
+        else { item.x = maxBound - p.radius; item.vx *= -0.85; }
+        sfx.play(240, 0.05, "sine", 0.1);
+      }
+      if (py - p.radius < minBound) {
+        if (p.isStriker) { this.strikerY = minBound + p.radius; this.strikerVy *= -0.85; }
+        else { item.y = minBound + p.radius; item.vy *= -0.85; }
+        sfx.play(240, 0.05, "sine", 0.1);
+      }
+      if (py + p.radius > maxBound) {
+        if (p.isStriker) { this.strikerY = maxBound - p.radius; this.strikerVy *= -0.85; }
+        else { item.y = maxBound - p.radius; item.vy *= -0.85; }
+        sfx.play(240, 0.05, "sine", 0.1);
+      }
+    }
+
+    // Elastic Circle-Circle Collisions
+    for (let i = 0; i < allPieces.length; i++) {
+      for (let j = i + 1; j < allPieces.length; j++) {
+        const p1 = allPieces[i];
+        const p2 = allPieces[j];
+
+        const x1 = p1.isStriker ? this.strikerX : p1.obj.x;
+        const y1 = p1.isStriker ? this.strikerY : p1.obj.y;
+        const x2 = p2.isStriker ? this.strikerX : p2.obj.x;
+        const y2 = p2.isStriker ? this.strikerY : p2.obj.y;
+
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const dist = Math.hypot(dx, dy);
+        const minDist = p1.radius + p2.radius;
+
+        if (dist < minDist && dist > 0) {
+          // Normal & Tangent vectors
+          const nx = dx / dist;
+          const ny = dy / dist;
+
+          // Overlap resolution
+          const overlap = (minDist - dist) / 2;
+          if (p1.isStriker) { this.strikerX -= nx * overlap; this.strikerY -= ny * overlap; }
+          else { p1.obj.x -= nx * overlap; p1.obj.y -= ny * overlap; }
+          if (p2.isStriker) { this.strikerX += nx * overlap; this.strikerY += ny * overlap; }
+          else { p2.obj.x += nx * overlap; p2.obj.y += ny * overlap; }
+
+          // Velocity collision math
+          const v1x = p1.isStriker ? this.strikerVx : p1.obj.vx;
+          const v1y = p1.isStriker ? this.strikerVy : p1.obj.vy;
+          const v2x = p2.isStriker ? this.strikerVx : p2.obj.vx;
+          const v2y = p2.isStriker ? this.strikerVy : p2.obj.vy;
+
+          const kx = v1x - v2x;
+          const ky = v1y - v2y;
+          const p = 2 * (nx * kx + ny * ky) / (p1.mass + p2.mass);
+
+          if (p1.isStriker) { this.strikerVx -= p * p2.mass * nx * 0.92; this.strikerVy -= p * p2.mass * ny * 0.92; }
+          else { p1.obj.vx -= p * p2.mass * nx * 0.92; p1.obj.vy -= p * p2.mass * ny * 0.92; }
+
+          if (p2.isStriker) { this.strikerVx += p * p1.mass * nx * 0.92; this.strikerVy += p * p1.mass * ny * 0.92; }
+          else { p2.obj.vx += p * p1.mass * nx * 0.92; p2.obj.vy += p * p1.mass * ny * 0.92; }
+
+          sfx.play(480 + Math.random() * 200, 0.06, "triangle", 0.15);
+        }
+      }
+    }
+
+    // Check Corner Pockets
+    for (let i = this.coins.length - 1; i >= 0; i--) {
+      const c = this.coins[i];
+      for (let pocket of this.pockets) {
+        if (Math.hypot(c.x - pocket.x, c.y - pocket.y) < this.pocketRadius - 4) {
+          sfx.play(800, 0.25, "sine", 0.35);
+          if (c.type === "WHITE") this.whiteScore += 10;
+          else if (c.type === "BLACK") this.blackScore += 10;
+          else if (c.type === "QUEEN") { this.whiteScore += 30; this.queenCovered = true; }
+          this.coins.splice(i, 1);
+          this.updateHUD();
+          break;
+        }
+      }
+    }
+
+    // Check Striker Pocket (Foul)
+    for (let pocket of this.pockets) {
+      if (Math.hypot(this.strikerX - pocket.x, this.strikerY - pocket.y) < this.pocketRadius - 4) {
+        sfx.play(150, 0.3, "sawtooth", 0.4);
+        this.resetStriker();
+        break;
+      }
+    }
+
+    // Motion Settlement Check
+    if (this.isShotActive) {
+      let isResting = Math.hypot(this.strikerVx, this.strikerVy) < 0.05;
+      for (let c of this.coins) {
+        if (Math.hypot(c.vx, c.vy) > 0.05) {
+          isResting = false;
+          break;
+        }
+      }
+      if (isResting) {
+        this.resetStriker();
+      }
+    }
+  }
+
+  drawBoard() {
+    this.ctx.clearRect(0, 0, this.size, this.size);
+
+    // Outer Wooden Frame
+    this.ctx.fillStyle = "#451a03";
+    this.ctx.fillRect(0, 0, this.size, this.size);
+
+    // Inner Playing Surface
+    this.ctx.fillStyle = "#fde68a";
+    this.ctx.fillRect(this.center - this.halfBoard, this.center - this.halfBoard, this.boardSize, this.boardSize);
+
+    // Decorative Lines & Circles
+    this.ctx.strokeStyle = "#92400e";
+    this.ctx.lineWidth = 2;
+
+    // Center Circle
+    this.ctx.beginPath();
+    this.ctx.arc(this.center, this.center, 40, 0, Math.PI * 2);
+    this.ctx.stroke();
+
+    // Corner Baselines
+    const baseOffset = this.halfBoard - 85;
+    const baseLen = 160;
+
+    // Bottom Baseline
+    this.ctx.beginPath();
+    this.ctx.moveTo(this.center - baseLen, this.center + baseOffset);
+    this.ctx.lineTo(this.center + baseLen, this.center + baseOffset);
+    this.ctx.stroke();
+
+    // Baseline circles
+    this.ctx.fillStyle = "#b45309";
+    this.ctx.beginPath();
+    this.ctx.arc(this.center - baseLen, this.center + baseOffset, 12, 0, Math.PI * 2);
+    this.ctx.arc(this.center + baseLen, this.center + baseOffset, 12, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    // 4 Corner Pockets
+    for (let p of this.pockets) {
+      this.ctx.fillStyle = "#0f172a";
+      this.ctx.beginPath();
+      this.ctx.arc(p.x, p.y, this.pocketRadius, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.strokeStyle = "#b45309";
+      this.ctx.lineWidth = 3;
+      this.ctx.stroke();
+    }
+
+    // Draw Coins
+    for (let c of this.coins) {
+      this.ctx.fillStyle = c.color;
+      this.ctx.beginPath();
+      this.ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.strokeStyle = c.type === "WHITE" ? "#cbd5e1" : "#475569";
+      this.ctx.lineWidth = 2;
+      this.ctx.stroke();
+
+      // Inner emblem
+      this.ctx.fillStyle = c.type === "QUEEN" ? "#fef08a" : "rgba(100,100,100,0.4)";
+      this.ctx.beginPath();
+      this.ctx.arc(c.x, c.y, c.radius * 0.4, 0, Math.PI * 2);
+      this.ctx.fill();
+    }
+
+    // Draw Striker
+    this.ctx.fillStyle = "#38bdf8";
+    this.ctx.beginPath();
+    this.ctx.arc(this.strikerX, this.strikerY, this.strikerRadius, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.strokeStyle = "#0284c7";
+    this.ctx.lineWidth = 3;
+    this.ctx.stroke();
+
+    // Draw Drag Aim Vector
+    if (this.isDragging) {
+      const dx = this.dragStart.x - this.dragCurrent.x;
+      const dy = this.dragStart.y - this.dragCurrent.y;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist > 5) {
+        const aimX = this.strikerX + dx * 1.5;
+        const aimY = this.strikerY + dy * 1.5;
+
+        this.ctx.strokeStyle = "#facc15";
+        this.ctx.lineWidth = 3;
+        this.ctx.setLineDash([6, 6]);
+        this.ctx.beginPath();
+        this.ctx.moveTo(this.strikerX, this.strikerY);
+        this.ctx.lineTo(aimX, aimY);
+        this.ctx.stroke();
+        this.ctx.setLineDash([]);
+
+        // Power Pull Vector
+        this.ctx.strokeStyle = "#ef4444";
+        this.ctx.lineWidth = 4;
+        this.ctx.beginPath();
+        this.ctx.moveTo(this.strikerX, this.strikerY);
+        this.ctx.lineTo(this.dragCurrent.x, this.dragCurrent.y);
+        this.ctx.stroke();
+      }
+    }
+  }
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  window.game = new CarromArenaEngine();
+});
+</script>
+
+</body>
+</html>
