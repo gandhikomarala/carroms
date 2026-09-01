@@ -1,32 +1,32 @@
 # Royal Carrom Club — 2D Rigid Body Physics Simulation
 
-Royal Carrom Club is a production-grade 2D rigid body physics simulation of professional carrom board gameplay. It implements precision vector impulse striker mechanics, coefficient of friction & restitution collisions, queen cover validation rules, audio feedback synthesis, and offline-first client-side state synchronization.
+Royal Carrom Club — 2D Rigid Body Physics Simulation is a production-grade enterprise application designed with domain-driven architecture, automated quality validation, and high-performance microservices.
 
 ---
 
 ## Dependencies
 
-* **Python Engine**: Python 3.10+
-* **Backend Framework**: FastAPI, Uvicorn, Pydantic v2
-* **Testing Suite**: Pytest, Pytest-cov
-* **Frontend HUD**: Modern HTML5 Canvas, Vanilla ES6 JavaScript, Web Audio API
+* **Runtime**: Python 3.10+ / Node.js 18+
+* **Framework**: FastAPI, Uvicorn, Pydantic v2
+* **Quality & Test**: Pytest, Pytest-cov
+* **Frontend**: HTML5 Canvas / ES6+, Zero-Dependency Web Client
 
 ---
 
 ## Installation
 
-### 1. Clone & Set Up Python Virtual Environment
+### 1. Set Up Python Virtual Environment
 ```bash
-git clone git@github.com:gandhikomarala/carroms.git
+git clone gandhikomarala/carroms.git
 cd carroms
 python -m venv venv
-# Activate on Windows:
+# Windows:
 .\venv\Scripts\activate
-# Activate on Linux/macOS:
+# Linux/macOS:
 source venv/bin/activate
 ```
 
-### 2. Install Project Dependencies
+### 2. Install Dependencies
 ```bash
 python -m pip install --upgrade pip
 pip install -r requirements.txt
@@ -36,39 +36,36 @@ pip install -r requirements.txt
 
 ## Build
 
-Build the containerized production image locally using Docker:
+Build containerized production image locally:
 ```bash
-docker build -t royal-carrom-club:latest .
+docker build -t carroms:latest .
 ```
 
 ---
 
 ## Run
 
-### Local Microservice Mode
+### Microservice Execution
 ```bash
-python -m uvicorn Backend.main:app --host 0.0.0.0 --port 8004 --reload
+python -m uvicorn Backend.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### Containerized Deployment
+### Containerized Orchestration
 ```bash
 docker-compose up -d --build
 ```
 
-### Static Web Client
-Open `index.html` directly in any modern web browser or serve via:
+### Static Web UI
 ```bash
-python -m http.server 8004
+python -m http.server 8000
 ```
 
 ---
 
 ## Usage
 
-1. Launch the interactive canvas in your browser.
-2. Select game mode (*Single Player Practice, Local 2-Player, Tournament Mode*).
-3. Drag the mouse on the striker to adjust impulse angle and power meter gauge.
-4. Release to shoot and pocket coins according to ICF (International Carrom Federation) tournament rules.
+1. Access the web dashboard via `http://localhost:8000` or the live GitHub Pages link.
+2. Interact with the core domain engine, real-time analytics, and data persistence layers.
 
 ---
 
@@ -76,5 +73,5 @@ python -m http.server 8004
 
 Execute the automated test suite with coverage report:
 ```bash
-pytest tests/ -v --cov=Backend/
+pytest tests/ -v
 ```
