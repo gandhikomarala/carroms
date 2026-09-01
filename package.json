@@ -1,0 +1,11 @@
+{
+  "name": "royal-carrom-club",
+  "version": "2.4.0",
+  "description": "2D Rigid Body Physics Simulation of Carrom",
+  "main": "index.html",
+  "scripts": {
+    "test": "pytest tests/",
+    "build": "docker build -t carroms ."
+  },
+  "dependencies": {}
+}
