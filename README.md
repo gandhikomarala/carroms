@@ -1,40 +1,18 @@
-# CARROM ARENA — Digital Mobile Board Game Platform
+# Royal Carrom Club — 2D Rigid Body Physics Simulation
 
-Carrom Arena is an original digital implementation of the traditional carrom board game, featuring realistic circle collision physics, baseline striker aiming, Queen cover validation, AI bot opponents, pass-and-play multiplayer, and distributed backend services.
+Precision 2D physics simulation of authentic carrom boards with vector impulse striker aiming, restitution and coefficient of friction physics, queen cover rules, and realistic pocketing.
 
----
+## Product Highlights
+- **Domain**: Game
+- **Visual Theme**: Polished Rosewood & Ivory Felt
+- **State Persistence**: Browser localStorage & FastAPI microservices
+- **Zero-Dependency Web Client**: Works seamlessly on GitHub Pages
 
-## 🎯 Architecture Overview
-
-```
-CarromArena/
-├── UnityClient/            # Unity C# Client Architecture
-│   └── Assets/Scripts/     # Board, Physics, Coins, Striker, Input, Turns, Rules, Scoring, AI, UI, Audio
-├── Backend/                # Python FastAPI Distributed Backend Services
-│   ├── app/                # API Endpoints, Models, Repositories, Analytics, NVIDIA Gateway
-│   └── tests/              # Pytest automated test matrix (180 tests)
-├── Infrastructure/         # Docker Compose, PostgreSQL configurations
-├── docs/                   # Architecture, Game Design, Rules Engine, API & Deployment Specifications
-├── scripts/                # Standalone demo runner & diagnostic probes
-└── index.html              # Standalone Playable Web Edition
-```
-
----
-
-## 🚀 Quick Start
-
-### 1. Run the Standalone Game Probe
+## Architecture & Quick Start
 ```bash
-python scripts/demo_run.py
-```
+# Run Tests
+pytest tests/
 
-### 2. Play the Carrom Board Game
-Open `index.html` directly in your browser or serve with:
-```bash
-python -m http.server 8000
-```
-
-### 3. Run Backend Test Matrix
-```bash
-pytest Backend/tests/ -v
+# Docker Deployment
+docker-compose up -d --build
 ```
